@@ -67,7 +67,7 @@ def extract_data_from_efetch(xml_content):
     return articles_data
 
 # Usage
-for i in tqdm(range(19)):
+for i in tqdm(range(199)):
     ids = get_pubmed_ids('alzheimer', retstart=i)
     fetched = fetch_pubmed_entries(ids)
     articles_data = extract_data_from_efetch(fetched)
