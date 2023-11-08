@@ -76,6 +76,13 @@ plt.xlabel('Degree')
 plt.ylabel('Count')
 plt.savefig('images/degree_distribution.png')
 
+communities = nx.community.louvain_communities(A)
+communities = sorted(communities, key=len, reverse=True)
+print('Number of communities: ', len(communities))
+print('Number of nodes in the largest community: ', len(communities[0]))
+final_partition_modularity = nx.community.modularity(A, communities)
+print('Final partition modularity: ', final_partition_modularity)
+
 """
 G = nx.Graph()
 
