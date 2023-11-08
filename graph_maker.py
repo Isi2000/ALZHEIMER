@@ -3,8 +3,9 @@ from networkx.algorithms import bipartite
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
-from collections import Counter
-from itertools import combinations
+import os
+#from collections import Counter
+#from itertools import combinations
 
 # Read data
 
@@ -29,6 +30,51 @@ for article in data:
 
 print(len(data))
 print('Number of nodes: ', G.number_of_nodes())
+print('Is connected: ', nx.is_connected(G))
+print('Is bipartite: ', bipartite.is_bipartite(G))
+
+top_nodes = {n for n, d in G.nodes(data=True) if d["bipartite"] == 0}
+bottom_nodes = set(G) - top_nodes
+
+A = bipartite.weighted_projected_graph(G, nodes = bottom_nodes, ratio=False)
+print('Number of nodes in the projected graph: ', A.number_of_nodes())
+print('Number of edges in the projected graph: ', A.number_of_edges())
+
+print('Connected graph (Authors): ', nx.is_connected(A))
+
+print('Number of connected components (Authors): ', nx.number_connected_components(A))
+
+connected_components = list(nx.connected_components(A))
+#filtered_components = [comp for comp in connected_components if len(comp) > 1]
+
+main_component = max(connected_components, key=len)
+print('Number of nodes in the main component: ', len(main_component))
+print('Number of edges in the main component: ', A.subgraph(main_component).number_of_edges())
+
+# Degree analysis
+
+degrees_sequence = sorted((degree for node, degree in A.degree()), reverse=True)
+dmax = max(degrees_sequence)
+print('Maximum degree: ', dmax)
+
+os.makedirs('images', exist_ok=True)
+
+#Degree rank plot
+plt.figure(figsize=(8, 6))
+plt.loglog(degrees_sequence, 'b-', marker='o')
+plt.title('Degree rank plot')
+plt.ylabel('degree')
+plt.xlabel('rank')
+plt.savefig('images/degree_rank_plot.png')
+
+#Degree histogram
+plt.figure(figsize=(8, 6))
+degrees = [G.degree(n) for n in A.nodes()]
+plt.hist(degrees, bins=1000, alpha=0.5, color='b')
+plt.title('Degree Distribution')
+plt.xlabel('Degree')
+plt.ylabel('Count')
+plt.savefig('images/degree_distribution.png')
 
 """
 G = nx.Graph()
