@@ -1,34 +1,103 @@
-
 import networkx as nx
+from networkx.algorithms import bipartite
 import matplotlib.pyplot as plt
 import pandas as pd
 import json
+from collections import Counter
+from itertools import combinations
+
+# Read data
 
 with open('pubmed_data.json', 'r') as file:
     data = [json.loads(line) for line in file]
-print(type(data))
 
-# Create a directed graph
-G = nx.DiGraph()
+
+#print(type(data), data[0])
+#print(len(data))
+
+#data is a list of dictionaries
+
+G = nx.Graph()
+
+# Add nodes and edges with the attribute 'bipartite'
+
+for article in data:
+    G.add_node(article["Id"], bipartite=0)
+    for author in article["Authors"]:
+        G.add_node(author, bipartite=1)
+        G.add_edge(article["Id"], author)
+
+print(len(data))
+print('Number of nodes: ', G.number_of_nodes())
+
+"""
+G = nx.Graph()
+
+def get_combinations_of_2(arr):
+    all_combinations = list(combinations(arr, 2))
+    return all_combinations
 
 # Add nodes and edges
-for item in data:
-    source_id = item["Id"]
-    cited_articles = item["Cited_Articles"]
+edges_lists = []
 
-    # Add nodes (if not already added)
-    G.add_node(source_id)
+for article in data:
+    edges_lists.append(get_combinations_of_2(article["Authors"]))
 
-    for target_id in cited_articles:
-        # Add edges from source_id to the cited articles
-        G.add_edge(source_id, target_id)
+for edge_list in edges_lists:
+    G.add_edges_from(edge_list)
 
+print('Number of nodes: ', G.number_of_nodes())
+print('Number of edges: ', G.number_of_edges())
 
-# Number of nodes and edges
-num_nodes = len(G.nodes)
-num_edges = len(G.edges)
-print(f"Number of nodes: {num_nodes}")
-print(f"Number of edges: {num_edges}")
+print('Connected graph: ', nx.is_connected(G))
+
+print(nx.number_connected_components(G))
+
+connected_components = list(nx.connected_components(G))
+filtered_components = [comp for comp in connected_components if len(comp) > 1]
+
+main_component = max(filtered_components, key=len)
+print('Number of nodes in the main component: ', len(main_component))
+print('Number of edges in the main component: ', G.subgraph(main_component).number_of_edges())
+
+# Degree analysis
+
+degrees_sequence = sorted((degree for node, degree in G.degree()), reverse=True)
+dmax = max(degrees_sequence)
+print('Maximum degree: ', dmax)
+
+#Degree rank plot
+plt.figure(figsize=(8, 6))
+plt.loglog(degrees_sequence, 'b-', marker='o')
+plt.title('Degree rank plot')
+plt.ylabel('degree')
+plt.xlabel('rank')
+plt.show()
+
+#Degree histogram
+plt.figure(figsize=(8, 6))
+degrees = [G.degree(n) for n in G.nodes()]
+plt.hist(degrees, bins=1000, alpha=0.5, color='b')
+plt.title('Degree Distribution')
+plt.xlabel('Degree')
+plt.ylabel('Count')
+plt.show()
+"""
+
+"""
+degrees = [G.degree(n) for n in G.nodes()]
+plt.hist(degrees, bins=20, alpha=0.5, color='b')
+plt.title('Degree Distribution')
+plt.xlabel('Degree')
+plt.ylabel('Count')
+plt.show()
+
+flattened_list = [frozenset(t) for sublist in edges_lists for t in sublist]
+tuple_frequency = Counter(flattened_list)
+for tup, freq in tuple_frequency.items():
+    if freq > 4:
+        print(tuple(tup), freq)
+
 
 # Degree distribution
 in_degrees = dict(G.in_degree())
@@ -100,3 +169,4 @@ plt.bar(['Weakly Connected'], [len(weakly_connected_components)], color='y')
 plt.title('Number of Weakly Connected Components')
 plt.ylabel('Count')
 plt.show()
+"""
