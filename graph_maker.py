@@ -1,4 +1,5 @@
 import networkx as nx
+import numpy as np
 from networkx.algorithms import bipartite
 import matplotlib.pyplot as plt
 import pandas as pd
@@ -13,10 +14,59 @@ with open('pubmed_data.json', 'r') as file:
     data = [json.loads(line) for line in file]
 
 
-#print(type(data), data[0])
-#print(len(data))
+# Inizializza un dizionario per tenere traccia dei conteggi per ciascun intervallo di anni
+year_counts = {}
+author_counts = {}
 
-#data is a list of dictionaries
+for i in range(len(data)):
+    date = data[i]['Dates']
+    year = date.split('-')[0]
+    if year != 'Unknown':
+        year = int(year)
+        if year >= 1970 and year <= 2019:
+            # Calcola l'intervallo di anni (ad esempio, 1970-1974, 1975-1979, ecc.)
+            year_interval = (year // 5) * 5
+            # Aggiungi 1 al conteggio per l'intervallo di anni corrispondente
+            year_counts[year_interval] = year_counts.get(year_interval, 0) + 1
+            num_authors = len(data[i]['Authors'])
+            author_counts[year_interval] = author_counts.get(year_interval, 0) + num_authors
+
+# Stampa i conteggi per ciascun intervallo di anni
+for interval, count in sorted(year_counts.items()):
+    print(f"Articoli nel periodo {interval}-{interval + 4}: {count}")
+    print(f"Numero medio di autori per articolo nel periodo {interval}-{interval + 4}:\
+          {author_counts[interval] / count}")
+    
+
+# Dati dei conteggi per ciascun intervallo di anni
+intervals = sorted(year_counts.keys())
+counts = [year_counts[interval] for interval in intervals]
+author_per_paper_index = [author_counts[interval] / year_counts[interval] for interval in intervals]
+author_counts = [author_counts[interval] for interval in intervals]
+
+interval_labels = [f"{interval}-{interval + 4}" for interval in intervals]
+
+os.makedirs('images', exist_ok=True)
+
+# Creazione del grafico
+plt.figure(figsize=(10, 6))
+plt.scatter(intervals, counts, s=30, c='b', marker='o')
+plt.xlabel('Year')
+plt.ylabel('Number of Articles')
+plt.title('Number of Articles per Year')
+plt.xticks(intervals, interval_labels, rotation=45)
+plt.savefig('images/number_of_articles_per_year.png')
+
+# Creazione del grafico
+plt.figure(figsize=(10, 6))
+plt.scatter(intervals, author_per_paper_index, s=30, c='b', marker='o')
+plt.scatter(intervals, author_counts, s=30, c='r', marker='o')
+plt.xlabel('Year')
+plt.ylabel('Number of Authors per Article')
+plt.title('Number of Authors per Article per Year')
+plt.xticks(intervals, interval_labels, rotation=45)
+plt.savefig('images/number_of_authors_per_article_per_year.png')
+
 
 G = nx.Graph()
 
@@ -57,8 +107,6 @@ degrees_sequence = sorted((degree for node, degree in A.degree()), reverse=True)
 dmax = max(degrees_sequence)
 print('Maximum degree: ', dmax)
 
-os.makedirs('images', exist_ok=True)
-
 #Degree rank plot
 plt.figure(figsize=(8, 6))
 plt.loglog(degrees_sequence, 'b-', marker='o')
@@ -82,6 +130,8 @@ print('Number of communities: ', len(communities))
 print('Number of nodes in the largest community: ', len(communities[0]))
 final_partition_modularity = nx.community.modularity(A, communities)
 print('Final partition modularity: ', final_partition_modularity)
+
+
 
 """
 G = nx.Graph()
