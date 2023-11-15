@@ -5,8 +5,10 @@ import pandas as pd
 from concurrent.futures import ThreadPoolExecutor
 from tqdm import tqdm
 import time
+import numpy as np
 
-def split_ids(id_list, cluster_size=100):
+
+def split_ids(id_list, cluster_size=10):
     return [id_list[i:i + cluster_size] for i in range(0, len(id_list), cluster_size)]
 
 def read_ids_from_csv(file_path):
@@ -21,7 +23,7 @@ def read_ids_from_csv(file_path):
     """
     column_label = 'PubMed_ID'  
     df = pd.read_csv(file_path, names=[column_label], header=0)
-    return df[column_label][:1000].tolist()  # Adjust 'PubMed_ID' based on your CSV column name
+    return df[column_label].tolist()  # Adjust 'PubMed_ID' based on your CSV column name
 
 def parse_article(article):
     """
@@ -85,33 +87,34 @@ def parse_article(article):
         "Authors": authors,
         "MeSH_Terms": mesh_terms
     }
-def fetch_data_for_ids(ids, retries=6, delay=1):
-    """
-    Fetch and parse PubMed data for a list of PubMed IDs.
 
-    Args:
-        ids (list): List of PubMed IDs.
-        retries (int): Number of retries for the request.
-        delay (int): Delay between retries in seconds.
-
-    Returns:
-        list: List of dictionaries containing parsed article data.
-    """
+porcodio = []
+def fetch_data_for_ids(ids, retries=5, delay=2):
     for attempt in range(retries):
         id_string = ",".join(str(id) for id in ids)
         efetch_url = f"https://eutils.ncbi.nlm.nih.gov/entrez/eutils/efetch.fcgi?db=pubmed&id={id_string}&rettype=abstract"
         
         response = requests.get(efetch_url)
-        
+
         if response.status_code == 200:
-            root = ET.fromstring(response.text)
-            return [parse_article(article) for article in root.findall(".//PubmedArticle")]
-        elif response.status_code == 429:
-            print(f"Rate limit hit. Retrying after {delay} seconds...")
+            try:
+                root = ET.fromstring(response.text)
+                return [parse_article(article) for article in root.findall(".//PubmedArticle")]
+            except ET.ParseError as e:
+                print(f"Error parsing XML for IDs: {ids}")
+                print(f"Error details: {e}")
+                break
+            except Exception as e:
+                print(f"An unexpected error occurred for IDs: {ids}")
+                print(f"Error details: {e}")    
+                break
             time.sleep(delay)
-            delay *= 2  # Exponential backoff
         else:
-            print(f"Failed to fetch data. Status Code: {response.status_code}")
+            print(f"Failed to fetch data for IDs: {ids}. Status Code: {response.status_code}")
+            print(f"Failed XML:\n{response.text}")
+            time.sleep(delay)
+            porcodio.append(ids)
+            #np.savetxt(f"./DATA/{ids[0]}.csv", ids, delimiter=",", fmt='%s')
             break
 
     return []
@@ -138,7 +141,15 @@ def fetch_pubmed(ids_list):
 file_path = 'ids.csv'  
 ids = read_ids_from_csv(file_path)
 splitted_ids = split_ids(ids)
-print(type(splitted_ids))
-df = fetch_pubmed(splitted_ids)
-df.to_json("pubmed_data.json", orient="records", lines=True)
+num_b = 0
+splitted_ids = [splitted_ids[i:i+200] for i in range(num_b, len(splitted_ids),200)]
+print(len(splitted_ids))
+for batch_num, ids in enumerate(splitted_ids):
+    df = fetch_pubmed(ids)
+    df.to_json(f"./AUITOOOO/pubmed_data_{num_b+batch_num}_nuovi.json", orient="records", lines=True)
+    #print(df)
+    
+#df = fetch_pubmed(splitted_ids)
+#df.to_json("pubmed_data.json", orient="records", lines=True)
+np.savetxt("./DATA1/dati_non_riusciti_nuovi.csv", porcodio, delimiter=",", fmt='%s')
 
