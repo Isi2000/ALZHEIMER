@@ -2,11 +2,28 @@ import networkx as nx
 from networkx.algorithms import bipartite
 import json
 import numpy as np
+import os
+from tqdm import tqdm
 
 #Read the data
+print('Reading the data...')
 
-with open('pubmed_data.json', 'r') as file:
-    data = [json.loads(line) for line in file]
+folder_path = 'DATA1'
+
+file_list = [file for file in os.listdir(folder_path) if file.startswith('pubmed_data_') \
+             and file.endswith('_nuovi.json')]
+
+data = []
+
+for file_name in tqdm(file_list):
+    file_path = os.path.join(folder_path, file_name)
+    with open(file_path, 'r') as file:
+        file_data = [json.loads(line) for line in file]
+        data.extend(file_data)
+
+print('Data loaded successfully!')
+
+#Building the bipartite graph
 
 B = nx.Graph()
 
@@ -14,7 +31,7 @@ B = nx.Graph()
 
 print('Creating the bipartite graph...')
 
-for article in data:
+for article in tqdm(data):
     B.add_node(article["Id"], bipartite=0)
     for author in article["Authors"]:
         B.add_node(author, bipartite=1)
@@ -22,7 +39,7 @@ for article in data:
 
 print('Projecting the graph on the authors nodes (collaboration network)... ')
 
-article_nodes = {n for n, d in B.nodes(data=True) if d["bipartite"] == 0}
+article_nodes = {n for n, d in tqdm(B.nodes(data=True)) if d["bipartite"] == 0}
 authors_nodes = set(B) - article_nodes
 
 C = bipartite.weighted_projected_graph(B, nodes = authors_nodes, ratio=False) #weighted projection
