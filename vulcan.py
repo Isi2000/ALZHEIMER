@@ -13,14 +13,17 @@ file_list = [file for file in os.listdir(folder_path) if file.startswith('pubmed
 
 data = []
 
+print('Reading the data...')
 for file_name in tqdm(file_list):
     file_path = os.path.join(folder_path, file_name)
     with open(file_path, 'r') as file:
         file_data = [json.loads(line) for line in file]
         data.extend(file_data)
+print('Data loaded successfully!')
 
 df = pd.DataFrame(data)
 
+print('Preprocessing the data...')
 # Adding the year interval column
 df['Year'] = df['Dates'].str.split('-', expand=True)[0]
 
@@ -38,6 +41,7 @@ df['Year'] = df['Year'].apply(convert_year)
 df['YearInterval'] = (df['Year'] // 5) * 5
 
 # Computing the number of articles and authors per year interval
+print('Computing the number of articles and authors per year interval...')
 num_articles_per_interval = df['YearInterval'].value_counts().sort_index()
 
 df['NumAuthors'] = df['Authors'].apply(count_authors)
@@ -52,11 +56,17 @@ result_df = pd.DataFrame({
 # Computing the average number of authors per article
 result_df['AvgAuthorsPerArticle'] = result_df['NumAuthors'] / result_df['NumArticles']
 
+os.makedirs('results', exist_ok=True)
+
 # Saving the results in a JSON file
-result_df.to_json('result_df.json', orient='records', lines=True, index = True)
-print('done')
+print('Saving the results...')
+result_df.to_json('./results/num_paper_authors.json', orient='records', lines=True, index = True)
+print('Results saved!')
+
+print('Creating the bipartite graph...')
 
 B = nx.Graph()
+
 # Add nodes and edges from the DataFrame
 for _, row in df.iterrows():
     node_id = row['Id']
@@ -67,10 +77,24 @@ for _, row in df.iterrows():
             B.add_node(author, bipartite=1)  # bipartite=1 for 'Authors' nodes
             B.add_edge(node_id, author)
 
+print('Done!')
+
+print('Projecting the graph on the authors nodes (collaboration network)... ')
+
 article_nodes = {n for n, d in tqdm(B.nodes(data=True)) if d["bipartite"] == 0}
 authors_nodes = set(B) - article_nodes
 
 C = bipartite.weighted_projected_graph(B, authors_nodes) #weighted projection
+
+print('Done!')
+
+print('Computing the degree sequence...')
+degree_sequence = sorted((d for n, d in C.degree()), reverse=True)
+
+print('Saving the results...')
+np.save('./results/degree_sequence.npy', degree_sequence)
+print('Degree sequence saved!')
+
 number_of_authors = C.number_of_nodes()
 number_of_collaborations = C.number_of_edges()
 density = nx.density(C)
@@ -79,9 +103,6 @@ connected_components = list(nx.connected_components(C))
 filtered_connected_components = \
     [comp for comp in tqdm(connected_components) if len(comp) > 1] 
 
-print(C)
-print("done")
-
 
 print('Characteristics of the collaborative network: ')
 print('Number of nodes (authors): ', number_of_authors)
@@ -89,12 +110,14 @@ print('Number of edges: ', number_of_collaborations)
 print('Density: ', density)
 print('Number of connected components: ', number_of_connected_components)
 print('Number of connected components with more than one node: ', len(filtered_connected_components))
-largest_cc = max(filtered_connected_components, key=len)
+
+largest_cc = max(tqdm(filtered_connected_components, desc="Largest connected component", 
+                      unit="component"), key=len)
 
 
 #Building a network of the largest connected component
 
-largest_cc = max(filtered_connected_components, key=len)
+#largest_cc = max(filtered_connected_components, key=len)
 
 cc = C.subgraph(largest_cc).copy()
 
