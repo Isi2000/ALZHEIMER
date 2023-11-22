@@ -72,7 +72,7 @@ for _, row in df.iterrows():
     node_id = row['Id']
     authors = row['Authors']
     B.add_node(node_id, bipartite=0)  # bipartite=0 for 'Id' nodes
-    if len(authors) > 20:
+    if len(authors) > 0:
         for author in authors:
             B.add_node(author, bipartite=1)  # bipartite=1 for 'Authors' nodes
             B.add_edge(node_id, author)
@@ -117,9 +117,9 @@ largest_cc = max(tqdm(filtered_connected_components, desc="Largest connected com
 
 #Building a network of the largest connected component
 
-#largest_cc = max(filtered_connected_components, key=len)
+largest_cc = max(filtered_connected_components, key=len)
 
-cc = C.subgraph(largest_cc).copy()
+cc = C.subgraph(largest_cc)
 
 number_of_authors_cc = cc.number_of_nodes()
 number_of_collaborations_cc = cc.number_of_edges()

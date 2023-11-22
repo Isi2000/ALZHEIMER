@@ -26,7 +26,7 @@ for _, row in df.iterrows():
     node_id = row['Id']
     authors = row['Authors']
     B.add_node(node_id, bipartite=0)  # bipartite=0 for 'Id' nodes
-    if len(authors) > 20:
+    if len(authors) > 0:
         for author in authors:
             B.add_node(author, bipartite=1)  # bipartite=1 for 'Authors' nodes
             B.add_edge(node_id, author)
@@ -46,6 +46,13 @@ filtered_connected_components = \
 print(C)
 print("done")
 
+print('Computing the degree sequence...')
+degree_sequence = sorted((d for n, d in C.degree()), reverse=True)
+
+print('Saving the results...')
+np.save('./results/degree_sequence.npy', degree_sequence)
+print('Degree sequence saved!')
+
 
 print('Characteristics of the collaborative network: ')
 print('Number of nodes (authors): ', number_of_authors)
@@ -53,14 +60,21 @@ print('Number of edges: ', number_of_collaborations)
 print('Density: ', density)
 print('Number of connected components: ', number_of_connected_components)
 print('Number of connected components with more than one node: ', len(filtered_connected_components))
-largest_cc = max(filtered_connected_components, key=len)
+
+max_c_l = 0
+index = 0
+for idx, component in enumerate(filtered_connected_components):
+    if len(component) > max_c_l:
+        max_c_l = len(component)
+        index = idx
+print(max_c_l, idx)
 
 
 #Building a network of the largest connected component
 
-largest_cc = max(filtered_connected_components, key=len)
-
-cc = C.subgraph(largest_cc).copy()
+largest_cc = filtered_connected_components[index]
+print("fatto")
+cc = C.subgraph(largest_cc)#.copy()
 
 number_of_authors_cc = cc.number_of_nodes()
 number_of_collaborations_cc = cc.number_of_edges()
