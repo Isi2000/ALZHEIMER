@@ -5,46 +5,89 @@ import numpy as np
 import os
 from tqdm import tqdm
 import pandas as pd
-
+import concurrent.futures
 #Read the data
+
 folder_path = 'DATA1'
 
 file_list = [file for file in os.listdir(folder_path) if file.startswith('pubmed_data_') and file.endswith('_nuovi.json')]
 
 data = []
 
+print('Reading the data...')
 for file_name in tqdm(file_list):
     file_path = os.path.join(folder_path, file_name)
     with open(file_path, 'r') as file:
         file_data = [json.loads(line) for line in file]
         data.extend(file_data)
+print('Data loaded successfully!')
 
 df = pd.DataFrame(data)
+
+print('Preprocessing the data...')
+# Adding the year interval column
+df['Year'] = df['Dates'].str.split('-', expand=True)[0]
+
+def convert_year(year):
+    try:
+        return int(year)
+    except ValueError:
+        return pd.NaT
+
+def count_authors(authors_list):
+    return len(authors_list)
+    
+df['Year'] = df['Year'].apply(convert_year)
+
+df['YearInterval'] = (df['Year'] // 5) * 5
+
+# Computing the number of articles and authors per year interval
+print('Computing the number of articles and authors per year interval...')
+num_articles_per_interval = df['YearInterval'].value_counts().sort_index()
+
+df['NumAuthors'] = df['Authors'].apply(count_authors)
+num_authors_per_interval = df.groupby('YearInterval')['NumAuthors'].sum().sort_index()
+
+result_df = pd.DataFrame({
+    'YearInterval': num_articles_per_interval.index,
+    'NumArticles': num_articles_per_interval.values,
+    'NumAuthors': num_authors_per_interval.values
+})
+
+# Computing the average number of authors per article
+result_df['AvgAuthorsPerArticle'] = result_df['NumAuthors'] / result_df['NumArticles']
+
+os.makedirs('results', exist_ok=True)
+
+# Saving the results in a JSON file
+print('Saving the results...')
+result_df.to_json('./results/num_paper_authors.json', orient='records', lines=True, index = True)
+print('Results saved!')
+
+print('Creating the bipartite graph...')
+
 B = nx.Graph()
+
 # Add nodes and edges from the DataFrame
 for _, row in df.iterrows():
     node_id = row['Id']
     authors = row['Authors']
     B.add_node(node_id, bipartite=0)  # bipartite=0 for 'Id' nodes
-    if len(authors) > 0:
+    if len(authors) > 70:
         for author in authors:
             B.add_node(author, bipartite=1)  # bipartite=1 for 'Authors' nodes
             B.add_edge(node_id, author)
+
+print('Done!')
+
+print('Projecting the graph on the authors nodes (collaboration network)... ')
 
 article_nodes = {n for n, d in tqdm(B.nodes(data=True)) if d["bipartite"] == 0}
 authors_nodes = set(B) - article_nodes
 
 C = bipartite.weighted_projected_graph(B, authors_nodes) #weighted projection
-number_of_authors = C.number_of_nodes()
-number_of_collaborations = C.number_of_edges()
-density = nx.density(C)
-number_of_connected_components = nx.number_connected_components(C)
-connected_components = list(nx.connected_components(C))
-filtered_connected_components = \
-    [comp for comp in tqdm(connected_components) if len(comp) > 1] 
 
-print(C)
-print("done")
+print('Done!')
 
 print('Computing the degree sequence...')
 degree_sequence = sorted((d for n, d in C.degree()), reverse=True)
@@ -52,6 +95,14 @@ degree_sequence = sorted((d for n, d in C.degree()), reverse=True)
 print('Saving the results...')
 np.save('./results/degree_sequence.npy', degree_sequence)
 print('Degree sequence saved!')
+
+number_of_authors = C.number_of_nodes()
+number_of_collaborations = C.number_of_edges()
+density = nx.density(C)
+number_of_connected_components = nx.number_connected_components(C)
+connected_components = list(nx.connected_components(C))
+filtered_connected_components = \
+    [comp for comp in tqdm(connected_components) if len(comp) > 1] 
 
 
 print('Characteristics of the collaborative network: ')
@@ -61,28 +112,44 @@ print('Density: ', density)
 print('Number of connected components: ', number_of_connected_components)
 print('Number of connected components with more than one node: ', len(filtered_connected_components))
 
-max_c_l = 0
-index = 0
-for idx, component in enumerate(filtered_connected_components):
-    if len(component) > max_c_l:
-        max_c_l = len(component)
-        index = idx
-print(max_c_l, idx)
+largest_cc = max(tqdm(filtered_connected_components, desc="Largest connected component", 
+                      unit="component"), key=len)
 
 
 #Building a network of the largest connected component
 
-largest_cc = filtered_connected_components[index]
-print("fatto")
-cc = C.subgraph(largest_cc)#.copy()
+largest_cc = max(filtered_connected_components, key=len)
 
-number_of_authors_cc = cc.number_of_nodes()
-number_of_collaborations_cc = cc.number_of_edges()
-clustering_coefficient = nx.average_clustering(cc, weight = 'weight')
-clustering_coefficient_unweighted = nx.average_clustering(cc)
-average_shortest_path = nx.average_shortest_path_length(cc, \
-                                                        weight= lambda u, v, d: 1 / d['weight'] )
-average_shortest_path_unweighted = nx.average_shortest_path_length(cc)
+cc = C.subgraph(largest_cc)
+
+print('Computing metrics in parallel...')
+
+# Function to compute metrics
+def compute_metrics(cc):
+    number_of_authors = cc.number_of_nodes()
+    print("---------Done---------")
+    number_of_collaborations = cc.number_of_edges()
+    print("---------Done---------")
+    clustering_coefficient = nx.average_clustering(cc, weight='weight')
+    print("---------Done---------")
+    clustering_coefficient_unweighted = nx.average_clustering(cc)
+    print("---------Done---------")
+    average_shortest_path = nx.average_shortest_path_length(cc, weight=lambda u, v, d: 1 / d['weight'])
+    print("---------Done---------")
+    average_shortest_path_unweighted = nx.average_shortest_path_length(cc)
+
+    return number_of_authors, number_of_collaborations, clustering_coefficient, clustering_coefficient_unweighted, average_shortest_path, average_shortest_path_unweighted
+
+# Execute the function in parallel using ThreadPoolExecutor
+with concurrent.futures.ThreadPoolExecutor() as executor:
+    # Pass the connected component (cc) to the function using the submit method
+    futures = [executor.submit(compute_metrics, cc)]
+
+    # Wait for all tasks to complete
+    concurrent.futures.wait(futures)
+
+# Get the result of the computation
+number_of_authors_cc, number_of_collaborations_cc, clustering_coefficient, clustering_coefficient_unweighted, average_shortest_path, average_shortest_path_unweighted = futures[0].result()
 
 print('Characteristics of the largest connected component:')
 print('Number of nodes (authors): ', number_of_authors_cc)
@@ -158,3 +225,4 @@ Borda_score_sum_sorted = sorted(Borda_score_sum.items(), key = lambda x: x[1], r
 print('Ranking of authors by Borda score:----------------------------------------------------------')
 for influential_author in Borda_score_sum_sorted[:10]:
     print('Author: ', influential_author[0], 'Borda score: ', influential_author[1])
+
