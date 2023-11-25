@@ -59,12 +59,13 @@ result_df['AvgAuthorsPerArticle'] = result_df['NumAuthors'] / result_df['NumArti
 os.makedirs('results', exist_ok=True)
 
 # Saving the results in a JSON file
+"""
 print('Saving the results...')
 result_df.to_json('./results/num_paper_authors.json', orient='records', lines=True, index = True)
 print('Results saved!')
 
 print('Creating the bipartite graph...')
-
+"""
 B = nx.Graph()
 
 # Add nodes and edges from the DataFrame
@@ -86,6 +87,9 @@ authors_nodes = set(B) - article_nodes
 
 C = bipartite.weighted_projected_graph(B, authors_nodes) #weighted projection
 
+nx.write_edgelist(C, './edges.txt')
+
+"""
 print('Done!')
 
 print('Computing the degree sequence...')
@@ -203,3 +207,4 @@ Borda_score_sum_sorted = sorted(Borda_score_sum.items(), key = lambda x: x[1], r
 print('Ranking of authors by Borda score:----------------------------------------------------------')
 for influential_author in Borda_score_sum_sorted[:10]:
     print('Author: ', influential_author[0], 'Borda score: ', influential_author[1])
+"""
