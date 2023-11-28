@@ -6,7 +6,7 @@ import os
 from tqdm import tqdm
 import pandas as pd
 
-folder_path = '../DATA1'
+folder_path = './DATA1'
 
 file_list = [file for file in os.listdir(folder_path) if file.startswith('pubmed_data_') and file.endswith('_nuovi.json')]
 

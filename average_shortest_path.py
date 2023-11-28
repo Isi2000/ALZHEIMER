@@ -1,7 +1,15 @@
 from connected_component import cc
 import networkx as nx
+from igraph import *
+from itertools import combinations
+
+nodes = cc.nodes()
+combinations_list = list(combinations(nodes, 2))
+paths = []
 print("average_shortest_path computation")
-average_shortest_path = nx.average_shortest_path_length(cc, weight= lambda u, v, d: 1 / d['weight'] )
+for i in tqdm(combinations_list):
+    paths.append(cc.get_shortest_path(i[0], i[1]))
+    
 
 
 # Save clustering coefficient to a file
