@@ -6,7 +6,7 @@ import os
 from tqdm import tqdm
 import pandas as pd
 
-folder_path = './DATA1'
+folder_path = '../DATA1'
 
 file_list = [file for file in os.listdir(folder_path) if file.startswith('pubmed_data_') and file.endswith('_nuovi.json')]
 
@@ -82,4 +82,10 @@ print('Number of connected components with more than one node: ', len(filtered_c
 largest_cc = max(filtered_connected_components, key=len)
 
 cc = C.subgraph(largest_cc)
+
+
+output_edge_list_path = 'connected_component_edgelist.txt'
+nx.write_edgelist(cc, output_edge_list_path, data=False)
+
+
 
