@@ -1,6 +1,6 @@
 import networkx as nx
-from connected_component import cc
-
+#from connected_component import cc
+import numpy as np
 
 print("calculate clustering_coefficient")
 

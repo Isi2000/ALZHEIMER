@@ -83,6 +83,9 @@ largest_cc = max(filtered_connected_components, key=len)
 
 cc = C.subgraph(largest_cc)
 
-nodes = np.savetxt('data.txt', cc.nodes(), fmt='%f', delimiter=',')
 
-print("done")
+output_edge_list_path = 'connected_component_edgelist.txt'
+nx.write_edgelist(cc, output_edge_list_path, data=False)
+
+
+
